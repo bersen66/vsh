@@ -1,11 +1,36 @@
 message(STATUS "setting up Apache.Arrow")
 include(ExternalProject)
 
-ExternalProject_Add(
-    apache_arrow_submodule
-    SOURCE_DIR "${THIRD_PARTY_DIR}/arrow"
-    BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/arrow/build"
-    INSTALL_DIR "${EXTERN_DIR}/arrow"
-    CMAKE_ARGS
-        -DCMAKE_INSTALL_PREFIX="${EXTERN_DIR}/arrow/"
+set(ARROW_SOURCES_DIR "${THIRD_PARTY_DIR}/arrow/cpp")
+set(ARROW_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/deps/arrow")
+set(ARROW_INSTALL_DIR "${EXTERN_DIR}/arrow/")
+
+execute_process(
+    COMMAND ${CMAKE_COMMAND}
+      -S ${ARROW_SOURCES_DIR}    
+      -B ${ARROW_BUILD_DIR}
+      -DCMAKE_INSTALL_PREFIX=${ARROW_INSTALL_DIR}
+      -DARROW_BUILD_STATIC=ON
+      -DARROW_PARQUET=ON
+    RESULT_VARIABLE result 
 )
+
+if (NOT result EQUAL 0)
+    message(FATAL_ERROR "Failed to configure Arrow: ${result}")
+endif()
+
+
+execute_process(
+    COMMAND ${CMAKE_COMMAND} --build ${ARROW_BUILD_DIR} -j 8 --target install
+    RESULT_VARIABLE result
+)
+
+if (NOT result EQUAL 0)
+    message(FATAL_ERROR "Failed to compile Arrow: ${result}")
+endif()
+
+list(APPEND CMAKE_PREFIX_PATH "${EXTERN_DIR}arrow/lib/cmake/Arrow/")
+list(APPEND CMAKE_PREFIX_PATH "${EXTERN_DIR}arrow/lib/cmake/Parquet/")
+
+find_package(Arrow REQUIRED)
+find_package(Parquet REQUIRED)
