@@ -1,5 +1,4 @@
 message(STATUS "setting up Apache.Arrow")
-include(ExternalProject)
 
 set(ARROW_SOURCES_DIR "${THIRD_PARTY_DIR}/arrow/cpp")
 set(ARROW_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/deps/arrow")
@@ -12,6 +11,7 @@ execute_process(
       -DCMAKE_INSTALL_PREFIX=${ARROW_INSTALL_DIR}
       -DARROW_BUILD_STATIC=ON
       -DARROW_PARQUET=ON
+      -DARROW_CSV=ON  
     RESULT_VARIABLE result 
 )
 

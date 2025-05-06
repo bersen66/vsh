@@ -1,0 +1,5 @@
+option(VSH_BUILD_TESTS "Build tests" ON)
+message(STATUS "VSH_BUILD_TESTS=${VSH_BUILD_TESTS}")
+
+option(VSH_BUILD_DRIVER "Build driver" ON)
+message(STATUS "VSH_BUILD_DRIVER=${VSH_BUILD_DRIVER}")

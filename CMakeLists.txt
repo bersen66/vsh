@@ -9,9 +9,15 @@ set(THIRD_PARTY_DIR "${VSH_ROOT}/third_party/")
 set(EXTERN_DIR "${VSH_ROOT}/extern/")
 
 list(APPEND CMAKE_MODULE_PATH "${VSH_ROOT}/cmake")
-
+include(VshOptions)
 include(PrepareExternDir)
 include(BuildArrow)
+
+if (VSH_BUILD_TESTS)
+    include(BuildGtest)
+    enable_testing()
+    include(GoogleTest)
+endif()
 
 add_subdirectory(lib)
 

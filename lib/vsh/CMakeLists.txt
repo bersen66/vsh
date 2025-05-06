@@ -1,6 +1,8 @@
 set(
     VSH_SOURCES
-    src/vsh.cpp 
+    src/internal/parquet_key_iterator.cpp
+    src/key_iterator.cpp 
+    src/histogram.cpp
 )
 
 add_library(vsh ${VSH_SOURCES})
@@ -9,3 +11,25 @@ target_include_directories(
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+target_link_libraries(
+    vsh
+    Arrow::arrow_static
+    Parquet::parquet_static
+)
+
+
+if (VSH_BUILD_TESTS)
+    set(
+        VSH_TESTING_SOURCES
+        tests/iterator_test.cpp
+    )
+    
+    add_executable(vsh_tests ${VSH_TESTING_SOURCES})
+    target_link_libraries(vsh_tests vsh GTest::gtest_main)
+    gtest_discover_tests(vsh_tests)
+endif()
+
+
+
+
