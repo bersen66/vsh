@@ -1,7 +1,7 @@
 message(STATUS "setting up Apache.Arrow")
 
 set(ARROW_SOURCES_DIR "${THIRD_PARTY_DIR}/arrow/cpp")
-set(ARROW_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/deps/arrow")
+set(ARROW_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/deps/arrow/")
 set(ARROW_INSTALL_DIR "${EXTERN_DIR}/arrow/")
 
 execute_process(

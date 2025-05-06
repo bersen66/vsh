@@ -12,6 +12,7 @@ list(APPEND CMAKE_MODULE_PATH "${VSH_ROOT}/cmake")
 include(VshOptions)
 include(PrepareExternDir)
 include(BuildArrow)
+include(BuildDatasketches)
 
 if (VSH_BUILD_TESTS)
     include(BuildGtest)

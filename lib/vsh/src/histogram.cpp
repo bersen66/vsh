@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <vsh/histogram.hpp>
 #include <vsh/key_iterator.hpp>
+#include <DataSketches/quantiles_sketch.hpp>
 
 namespace vsh {
 
