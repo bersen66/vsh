@@ -4,6 +4,7 @@ set(
     src/key_iterator.cpp 
     src/eh_sketch.cpp
     src/histogram.cpp
+    src/quantile_hist.cpp
 )
 
 add_library(vsh ${VSH_SOURCES})
@@ -24,7 +25,6 @@ target_link_libraries(
 if (VSH_BUILD_TESTS)
     set(
         VSH_TESTING_SOURCES
-        #tests/iterator_test.cpp
         tests/eh_sketch_test.cpp
     )
     
