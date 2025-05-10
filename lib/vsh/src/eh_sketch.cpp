@@ -1,0 +1,114 @@
+#include <iterator>
+#include <tuple>
+#include <algorithm>
+#include <vsh/eh_sketch.hpp>
+
+namespace vsh {
+
+bool EHSketch::IsExpiredBox(const EHSketch::Box &b) const noexcept {
+    return (current_time_ - b.interval_finish) > window_size_;
+}
+
+void EHSketch::MergeBoxes(Box& to, const Box& from) noexcept {
+    to.count += from.count;
+    to.interval_start = std::min(to.interval_start, from.interval_start);
+    to.interval_finish = std::max(to.interval_finish, from.interval_finish);
+}
+
+EHSketch::EHSketch(std::uint64_t window_size, std::uint64_t precision)
+    : current_time_(0)
+    , window_size_(window_size)
+    , precision_(precision)
+    , box_threshold_((static_cast<double>(precision_) / 2.f) + 2)
+{}
+
+
+void EHSketch::Compress() {
+    using IterType = std::list<Box>::iterator;
+    
+    IterType curr = boxes_.begin();
+
+    while (curr != boxes_.end()) {
+
+        std::size_t range_len = 0;
+
+        
+        IterType next = curr;
+
+        while  (next != boxes_.end()) {
+            if (next->count > curr->count) {
+                break;
+            }
+            range_len++;
+            next++;
+        }
+        
+
+        while (range_len > box_threshold_) {
+            IterType oldest = std::prev(next);
+            IterType oldest_prev = std::prev(oldest);
+
+            MergeBoxes(*oldest, *oldest_prev);
+
+            next = boxes_.erase(oldest_prev);
+            range_len-=2;
+        }
+
+        curr = next;
+    }
+}
+
+void EHSketch::ExcludeExpiredBoxes() {
+    while (!boxes_.empty() && IsExpiredBox(boxes_.back())) {
+        boxes_.pop_back();
+    }
+}
+
+void EHSketch::Increment() {
+    boxes_.push_front(Box{
+        .count=1,
+        .interval_start=current_time_,
+        .interval_finish=current_time_,
+    }); 
+
+    Compress();
+    ExcludeExpiredBoxes();
+}
+
+std::uint64_t EHSketch::Count() const noexcept {
+    std::uint64_t result = 0;
+
+    for (const auto& box : boxes_) {
+        if (IsExpiredBox(box)) {
+            continue;
+        }
+        result += box.count; 
+    } 
+
+    return result;
+}
+
+void EHSketch::Tick() {
+    current_time_++;
+}
+
+bool operator==(const vsh::EHSketch::Box& lhs, const vsh::EHSketch::Box& rhs) {
+    return std::tie(lhs.count, lhs.interval_start, lhs.interval_finish) ==
+           std::tie(rhs.count, rhs.interval_start, rhs.interval_finish);
+}
+
+std::ostream& operator<<(std::ostream& out, const vsh::EHSketch::Box& box) {
+    out << "{ count:" << box.count << ", begin:" << box.interval_start << ", end:" << box.interval_finish << "}";
+    return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const std::list<vsh::EHSketch::Box>& boxes) {
+    out << "[";
+    for (const auto& box : boxes) {
+        out << box;
+    }
+    out << "]";
+    return out;
+}
+
+} // namespace vsh
