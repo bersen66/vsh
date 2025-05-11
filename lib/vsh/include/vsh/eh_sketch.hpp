@@ -42,7 +42,16 @@ public:
     void Tick();
 
 protected:
+    
+    // Functionality for reusing already allocated boxes;
+    Box& GetBox(std::list<Box>& dst, std::list<Box>& src);
+
+    std::list<EHSketch::Box>::iterator
+    EraseBox(std::list<Box>& dst, std::list<Box>& src, std::list<Box>::iterator it);
+
+protected:
     std::list<Box> boxes_;
+    std::list<Box> deleted_boxes_; // optimization for reusing allocated structs
     std::uint64_t current_time_;
     std::uint64_t window_size_;
     std::uint64_t precision_;

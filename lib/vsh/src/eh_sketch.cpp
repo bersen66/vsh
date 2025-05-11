@@ -6,7 +6,7 @@
 namespace vsh {
 
 bool EHSketch::IsExpiredBox(const EHSketch::Box &b) const noexcept {
-    return (current_time_ - b.interval_finish) > window_size_;
+    return (current_time_ - b.interval_start) > window_size_;
 }
 
 void EHSketch::MergeBoxes(Box& to, const Box& from) noexcept {
@@ -29,10 +29,7 @@ void EHSketch::Compress() {
     IterType curr = boxes_.begin();
 
     while (curr != boxes_.end()) {
-
         std::size_t range_len = 0;
-
-        
         IterType next = curr;
 
         while  (next != boxes_.end()) {
@@ -50,7 +47,7 @@ void EHSketch::Compress() {
 
             MergeBoxes(*oldest, *oldest_prev);
 
-            next = boxes_.erase(oldest_prev);
+            next = EraseBox(deleted_boxes_, boxes_, oldest_prev);
             range_len-=2;
         }
 
@@ -60,19 +57,34 @@ void EHSketch::Compress() {
 
 void EHSketch::ExcludeExpiredBoxes() {
     while (!boxes_.empty() && IsExpiredBox(boxes_.back())) {
-        boxes_.pop_back();
+        std::ignore = EraseBox(deleted_boxes_, boxes_, std::prev(boxes_.end()));
     }
 }
 
-void EHSketch::Increment() {
-    boxes_.push_front(Box{
-        .count=1,
-        .interval_start=current_time_,
-        .interval_finish=current_time_,
-    }); 
+EHSketch::Box& EHSketch::GetBox(std::list<Box>& dst, std::list<Box>& src) {
+    if (src.empty()) {
+        dst.emplace_front();
+    } else {
+        dst.splice(dst.begin(), src, src.begin());
+    }
+    return dst.front();
+}
 
-    Compress();
+std::list<EHSketch::Box>::iterator
+EHSketch::EraseBox(std::list<Box>& dst, std::list<Box>& src, std::list<Box>::iterator it) {
+    auto next = std::next(it);
+    dst.splice(dst.begin(), src, it);
+    return next;
+}
+
+void EHSketch::Increment() {
+    Box& box = GetBox(boxes_, deleted_boxes_);
+    box.count = 1;
+    box.interval_start = current_time_;
+    box.interval_finish = current_time_;
+
     ExcludeExpiredBoxes();
+    Compress();
 }
 
 std::uint64_t EHSketch::Count() const noexcept {
