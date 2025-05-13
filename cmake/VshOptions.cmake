@@ -1,4 +1,4 @@
-option(VSH_BUILD_TESTS "Build tests" ON)
+option(VSH_BUILD_TESTS "Build tests" OFF)
 message(STATUS "VSH_BUILD_TESTS=${VSH_BUILD_TESTS}")
 
 option(VSH_BUILD_DRIVER "Build driver" ON)

@@ -1,3 +1,4 @@
+#include "vsh/bar_splitting_hist.hpp"
 #include <cstdlib>
 #include <iostream>
 
@@ -18,7 +19,7 @@
 arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
     ARROW_ASSIGN_OR_RAISE(auto iter, vsh::ParquetKeyIterator::OverFile(file, 0));
     
-    auto h = vsh::QuantileHistBuilder(9);
+    auto h = vsh::BarSplittingHistBuilder(9);
     auto hist = vsh::MakeEquiDepthHistogram(h, iter);
     
     for (const auto& v : hist) {

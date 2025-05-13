@@ -5,6 +5,7 @@ set(
     src/eh_sketch.cpp
     src/histogram.cpp
     src/quantile_hist.cpp
+    src/bar_splitting_hist.cpp
 )
 
 add_library(vsh ${VSH_SOURCES})
@@ -26,6 +27,7 @@ if (VSH_BUILD_TESTS)
     set(
         VSH_TESTING_SOURCES
         tests/eh_sketch_test.cpp
+        tests/bar_splitting_hist_test.cpp
     )
     
     add_executable(vsh_tests ${VSH_TESTING_SOURCES})

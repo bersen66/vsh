@@ -2,10 +2,34 @@
 #include <gtest/gtest.h>
 #include <vsh/eh_sketch.hpp>
 
+namespace vsh {
+
+bool operator==(const vsh::EHSketch::Box& lhs, const vsh::EHSketch::Box& rhs) {
+    return std::tie(lhs.count, lhs.interval_start, lhs.interval_finish) ==
+           std::tie(rhs.count, rhs.interval_start, rhs.interval_finish);
+}
+
+std::ostream& operator<<(std::ostream& out, const vsh::EHSketch::Box& box) {
+    out << "{ count:" << box.count << ", begin:" << box.interval_start << ", end:" << box.interval_finish << "}";
+    return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const std::list<vsh::EHSketch::Box>& boxes) {
+    out << "[";
+    for (const auto& box : boxes) {
+        out << box;
+    }
+    out << "]";
+    return out;
+}
+
+
+} // namespace vsh
+
 struct EHSketchTest : public vsh::EHSketch {
 
-    explicit EHSketchTest(std::uint64_t window_size, std::uint64_t precision = 100)
-        : EHSketch(window_size, precision)
+    explicit EHSketchTest(std::uint64_t precision = 100, std::uint64_t window_size = -1)
+        : EHSketch(precision, window_size)
     {}
 
     using vsh::EHSketch::EHSketch;
@@ -33,7 +57,7 @@ struct EHSketchTest : public vsh::EHSketch {
 };
 
 TEST(TestEHSketch, Basic) {
-    EHSketchTest eh(/*window_size=*/35, /*precision=*/2);
+    EHSketchTest eh(/*precision=*/2, /*window_size=*/35);
 
     ASSERT_TRUE(eh.BoxesList().empty());
     ASSERT_EQ(eh.CurrentTime(), 0);
@@ -62,7 +86,7 @@ TEST(TestEHSketch, Basic) {
 }
 
 TEST(TestEHSketch, Compression) {
-    EHSketchTest eh(/*window_size=*/35, /*precision=*/2);
+    EHSketchTest eh(/*precision=*/2, /*window_size=*/35);
 
     using BoxList = std::list<vsh::EHSketch::Box>;
     std::vector<BoxList> expectation = {
@@ -94,7 +118,7 @@ TEST(TestEHSketch, Compression) {
 }
 
 TEST(TestEHSketch, ExcludingExpired) {
-    EHSketchTest eh(/*window_size=*/4, /*precision=*/2);
+    EHSketchTest eh(/*precision=*/2, /*window_size=*/4);
     using BoxList = std::list<vsh::EHSketch::Box>;
     std::vector<BoxList> expectation = {
         {{1, 1, 1}},

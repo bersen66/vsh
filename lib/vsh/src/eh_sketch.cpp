@@ -15,7 +15,7 @@ void EHSketch::MergeBoxes(Box& to, const Box& from) noexcept {
     to.interval_finish = std::max(to.interval_finish, from.interval_finish);
 }
 
-EHSketch::EHSketch(std::uint64_t window_size, std::uint64_t precision)
+EHSketch::EHSketch(std::uint64_t precision, std::uint64_t window_size)
     : current_time_(0)
     , window_size_(window_size)
     , precision_(precision)
@@ -63,7 +63,7 @@ void EHSketch::ExcludeExpiredBoxes() {
 
 EHSketch::Box& EHSketch::GetBox(std::list<Box>& dst, std::list<Box>& src) {
     if (src.empty()) {
-        dst.emplace_front();
+        dst.push_front(Box{});
     } else {
         dst.splice(dst.begin(), src, src.begin());
     }
@@ -102,25 +102,6 @@ std::uint64_t EHSketch::Count() const noexcept {
 
 void EHSketch::Tick() {
     current_time_++;
-}
-
-bool operator==(const vsh::EHSketch::Box& lhs, const vsh::EHSketch::Box& rhs) {
-    return std::tie(lhs.count, lhs.interval_start, lhs.interval_finish) ==
-           std::tie(rhs.count, rhs.interval_start, rhs.interval_finish);
-}
-
-std::ostream& operator<<(std::ostream& out, const vsh::EHSketch::Box& box) {
-    out << "{ count:" << box.count << ", begin:" << box.interval_start << ", end:" << box.interval_finish << "}";
-    return out;
-}
-
-std::ostream& operator<<(std::ostream& out, const std::list<vsh::EHSketch::Box>& boxes) {
-    out << "[";
-    for (const auto& box : boxes) {
-        out << box;
-    }
-    out << "]";
-    return out;
 }
 
 } // namespace vsh

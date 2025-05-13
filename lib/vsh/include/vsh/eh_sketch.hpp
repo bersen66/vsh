@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <ostream>
 #include <list>
 
 namespace vsh {
@@ -21,7 +20,7 @@ public:
 
 public:
     
-    explicit EHSketch(std::uint64_t window_size, std::uint64_t precision = 100);
+    explicit EHSketch(std::uint64_t precision = 100, std::uint64_t window_size = -1);
     EHSketch(const EHSketch&) = delete;
     EHSketch& operator=(const EHSketch&) = delete;
     EHSketch(EHSketch&&) noexcept = default;
@@ -41,6 +40,21 @@ public:
 
     void Tick();
 
+    std::size_t NumberOfBoxes() const noexcept {
+        return boxes_.size();
+    }
+
+    auto begin() {
+        return boxes_.begin();
+    }
+
+    auto end() {
+        return boxes_.end();
+    }
+
+    std::list<Box>& Boxes() {
+        return boxes_;
+    }
 protected:
     
     // Functionality for reusing already allocated boxes;
@@ -58,11 +72,6 @@ protected:
     long double box_threshold_;
 };
 
-bool operator==(const vsh::EHSketch::Box& lhs, const vsh::EHSketch::Box& rhs);
-
-std::ostream& operator<<(std::ostream& out, const vsh::EHSketch::Box& box);
-
-std::ostream& operator<<(std::ostream& out, const std::list<vsh::EHSketch::Box>& boxes); 
 } // namespace vsh
 
 
