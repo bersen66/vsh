@@ -1,35 +1,11 @@
-#include "vsh/histogram.hpp"
-#include <any>
-#include <arrow/array/builder_binary.h>
-#include <arrow/csv/options.h>
-#include <arrow/csv/reader.h>
-#include <arrow/io/api.h>
-#include <arrow/api.h>
-#include <arrow/io/file.h>
-#include <arrow/io/interfaces.h>
-#include <arrow/io/type_fwd.h>
-#include <arrow/result.h>
-#include <arrow/status.h>
-#include <arrow/table.h>
-#include <arrow/table_builder.h>
-#include <arrow/type.h>
-#include <arrow/type_fwd.h>
-#include <arrow/util/thread_pool.h>
-#include <arrow/util/type_fwd.h>
+#include "vsh/bar_splitting_hist.hpp"
 #include <cstdlib>
-#include <filesystem>
-#include <memory>
-#include <parquet/arrow/reader.h>
-#include <parquet/arrow/writer.h>
 #include <iostream>
-#include <parquet/exception.h>
-#include <parquet/file_reader.h>
-#include <parquet/properties.h>
-#include <parquet/type_fwd.h>
-#include <arrow/csv/api.h>
-#include <parquet/column_reader.h>
 
+#include <iterator>
 #include <vsh/key_iterator.hpp>
+#include <vsh/histogram.hpp>
+#include <vsh/quantile_hist.hpp>
 
 // #define ALLOW_INDICATORS
 #ifdef ALLOW_INDICATORS
@@ -38,49 +14,28 @@
 
 #include "vsh/consumer_node.hpp"
 
+
+
 arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
     ARROW_ASSIGN_OR_RAISE(auto iter, vsh::ParquetKeyIterator::OverFile(file, 0));
-#ifdef ALLOW_INDICATORS
-    std::size_t rows_count = 0;
-    using namespace indicators;
-    show_console_cursor(false);
-    BlockProgressBar bar{
-        option::BarWidth{80},
-        option::Start{"["},
-        option::End{"]"},
-        option::ForegroundColor{Color::white},
-        option::FontStyles{std::vector<FontStyle>{FontStyle::bold},},
-        option::PrefixText{"Scanning " +  std::filesystem::path(file).filename().string()},
-        option::ShowElapsedTime{true},
-    };
-    std::size_t elements_num = iter.StreamSize().value();
-    std::size_t prev_update = 0;
-    bar.set_progress(0.f);
-#endif // ALLOW_INDICATORS
-
-    auto hasher = std::hash<int64_t>{};
-    auto hist = vsh::MakeEquiDepthHistogram(iter);
-    /*
-    while (iter.HasNext()) {
-        iter.StepForward();
-        consumers[hasher(std::any_cast<int64_t>(iter.Value())) % consumers.size()]->Consume(iter.Value());
-
-#ifdef  ALLOW_INDICATORS
-        rows_count++;
-        if (rows_count - prev_update >= (iter.StreamSize().value()/100)) [[unlikely]] {
-            bar.set_progress(100.f * (static_cast<double>(rows_count) / static_cast<double>(elements_num)));
-            prev_update = rows_count;
-        }
-#endif // ALLOW_INDICATORS
+    
+    auto h = vsh::BarSplittingHistBuilder(9);
+    auto hist = vsh::MakeEquiDepthHistogram(h, iter);
+    
+    for (const auto& v : hist) {
+        std::cout << v << " ";
     }
+    std::cout << "\n";
 
-#ifdef ALLOW_INDICATORS
-    show_console_cursor(true);
-    bar.set_progress(100);
-    bar.mark_as_completed();
-    std::cout << "Stream size: " << iter.StreamSize().value() << " - " << rows_count << '\n';
-#endif // ALLOW_INDICATORS
-    */
+    {
+        ARROW_ASSIGN_OR_RAISE(auto itr, vsh::ParquetKeyIterator::OverFile(file, 0));
+        auto conv = iter.ValuesAdapter();
+        for (int i = 0;itr.HasNext(); itr.StepForward()) {
+            auto v = conv->AsDouble(itr.Value());
+            auto hist_pos = std::distance(hist.begin(), std::lower_bound(hist.begin(), hist.end(), v));
+            consumers[hist_pos]->Consume(iter.Value());
+        }
+    }
 
     return arrow::Status::OK();
 }
@@ -99,9 +54,6 @@ int main(int argc, char** argv) {
         auto c = std::dynamic_pointer_cast<vsh::LoadStatisticsAccumulator>(consumer_ptr);
         std::cout << c->rows_processed_ << "\n";
     }
-    // arrow::Status res = CreateParquetFromCsv(inputCsvPath, outputParquerPath);
-    // arrow::Status res = ReadLargeParquetTable(outputParquerPath); 
-
 
     return EXIT_SUCCESS;
 }
