@@ -1,4 +1,3 @@
-#include "gtest/gtest.h"
 #include <gtest/gtest.h>
 #include <vsh/bar_splitting_hist.hpp>
 
@@ -69,7 +68,7 @@ TEST(BASH, Adding) {
     for (int i = 0; i < 1'000'000; i++) {
         ASSERT_NO_FATAL_FAILURE(bash.Tick()) << " fail at iter " << i;
         ASSERT_NO_FATAL_FAILURE(bash.InsertValue(i)) << " fail at iter " << i;
-        EXPECT_TRUE(HasConsistentIndex(bash)) << " fail at iter " << i;
+        ASSERT_TRUE(HasConsistentIndex(bash)) << " fail at iter " << i;
     }
 
 }
