@@ -69,7 +69,7 @@ protected:
     std::uint64_t current_time_;
     std::uint64_t window_size_;
     std::uint64_t precision_;
-    long double box_threshold_;
+    double box_threshold_;
 };
 
 } // namespace vsh

@@ -22,7 +22,6 @@ EHSketch::EHSketch(std::uint64_t precision, std::uint64_t window_size)
     , box_threshold_((static_cast<double>(precision_) / 2.f) + 2)
 {}
 
-
 void EHSketch::Compress() {
     using IterType = std::list<Box>::iterator;
     

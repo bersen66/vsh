@@ -147,3 +147,10 @@ TEST(TestEHSketch, ExcludingExpired) {
           << "Actual: " << eh.BoxesList() << "\n"; 
     } 
 }
+
+TEST(TestEHSketch, NoFatalFailureLongRun) {
+    EHSketchTest eh(/*precision=*/2);
+    for (int i = 0; i < 1'000'000; i++) {
+        ASSERT_NO_FATAL_FAILURE(eh.TickIncrement());
+    }
+}
