@@ -16,8 +16,8 @@ public:
 
     struct Bar {
         EHSketch eh; 
-        long double interval_min;
-        long double interval_max;
+        double interval_min;
+        double interval_max;
         bool is_blocked = false;
     };
 
@@ -27,7 +27,7 @@ public:
 
     [[nodiscard]]std::size_t AggregateSize(BarIter it) const;
     
-    [[nodiscard]]bool NeedSplit(BarIter it, std::size_t max_size) const ;
+    [[nodiscard]]bool NeedSplit(BarIter it, std::size_t max_size) const;
 
     [[nodiscard]]bool EmptyBar(BarIter it) const;
 public:
@@ -53,7 +53,7 @@ protected:
 
     BarIter FindOrCreateBarFor(double value);
 
-    void SplitBar(BarIter it, long double Sm, std::size_t max_bar_size);
+    void SplitBar(BarIter it, double Sm, std::size_t max_bar_size);
 
     bool FindAndMergeBars(std::size_t max_bar_size);
 
@@ -70,6 +70,7 @@ protected:
     std::size_t NonBlockedBarsCount() const {
         return search_map_.size();
     }
+
 protected:
     std::list<Bar> bars_;
     std::map<double, BarIter> search_map_;

@@ -7,7 +7,7 @@
 #include <vsh/histogram.hpp>
 #include <vsh/quantile_hist.hpp>
 
-// #define ALLOW_INDICATORS
+//#define ALLOW_INDICATORS
 #ifdef ALLOW_INDICATORS
 #include "indicators.hpp"
 #endif
@@ -18,16 +18,46 @@
 
 arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
     ARROW_ASSIGN_OR_RAISE(auto iter, vsh::ParquetKeyIterator::OverFile(file, 0));
+#ifdef ALLOW_INDICATORS
+    using namespace indicators;
+    show_console_cursor(false);
+    indicators::ProgressBar bar{
+        option::BarWidth{50},
+        option::Start{" ["},
+        option::Fill{"█"},
+        option::Lead{"█"},
+        option::Remainder{"-"},
+        option::End{"]"},
+        option::PrefixText{"Training Gaze Network 👀"},
+        option::ForegroundColor{Color::yellow},
+        option::ShowPercentage{true},
+        option::ShowElapsedTime{true},
+        option::ShowRemainingTime{true},
+        option::FontStyles{std::vector<FontStyle>{FontStyle::bold}}
+      };
     
-    auto h = vsh::BarSplittingHistBuilder(9);
-    auto hist = vsh::MakeEquiDepthHistogram(h, iter);
-    
+    std::size_t rows_processed_ = 0;
+    std::size_t one_percent = iter.StreamSize().value() / 100;
+#endif // ALLOW_INDICATORS
+
+    auto h = vsh::BarSplittingHistBuilder(9, 4.f, 100, 100'000);
+
+    for(auto conv = iter.ValuesAdapter(); iter.HasNext(); iter.StepForward()) {
+#ifdef ALLOW_INDICATORS
+        if (rows_processed_++ % one_percent == 0) {
+            bar.tick();
+        } 
+#endif // ALLOW_INDICATORS
+        h.HandleIteration(iter, *conv);
+    }
+
+    auto hist = h.Build(); 
     for (const auto& v : hist) {
         std::cout << v << " ";
     }
     std::cout << "\n";
-
     {
+
         ARROW_ASSIGN_OR_RAISE(auto itr, vsh::ParquetKeyIterator::OverFile(file, 0));
         auto conv = iter.ValuesAdapter();
         for (int i = 0;itr.HasNext(); itr.StepForward()) {
@@ -37,6 +67,9 @@ arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
         }
     }
 
+#ifdef ALLOW_INDICATORS
+    show_console_cursor(true);
+#endif // ALLOW_INDICATORS
     return arrow::Status::OK();
 }
 

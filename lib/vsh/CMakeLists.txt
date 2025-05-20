@@ -8,7 +8,7 @@ set(
     src/bar_splitting_hist.cpp
 )
 
-add_library(vsh ${VSH_SOURCES})
+add_library(vsh SHARED ${VSH_SOURCES})
 target_include_directories(
     vsh PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

@@ -1,0 +1,27 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "debug",
+            "description": "Minimal preset for running vsh driver",
+            "hidden": false,
+            "binaryDir": "build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "VSH_BUILD_DRIVER": "ON",
+                "VSH_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "release",
+            "description": "Minimal preset for running vsh driver",
+            "hidden": false,
+            "binaryDir": "cmake-build-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "VSH_BUILD_DRIVER": "ON",
+                "VSH_BUILD_TESTS": "OFF"
+            }
+        }
+    ]
+}

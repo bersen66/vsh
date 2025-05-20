@@ -1,5 +1,5 @@
+#include "gtest/gtest.h"
 #include <gtest/gtest.h>
-#include <ostream>
 #include <vsh/bar_splitting_hist.hpp>
 
 struct BASHBuilderTestAdapter : public vsh::BarSplittingHistBuilder {
@@ -14,25 +14,62 @@ struct BASHBuilderTestAdapter : public vsh::BarSplittingHistBuilder {
         InsertIntoBar(value);
     }
 
+    const std::map<double, BarIter>& GetSearchMap() const {
+        return search_map_;
+    }
 
-    Bar& FindOrCreateBar(double value) {
-        return FindOrCreateBarFor(value)->second;
+
+    void Tick() {
+        vsh::BarSplittingHistBuilder::Tick();
     }
 };
 
-namespace vsh {
+testing::AssertionResult HasConsistentIndex(const BASHBuilderTestAdapter& bash) {
+    bool firstIter = true;
+    double prev_inerval_min, prev_inerval_max;
+    double curr_inerval_min, curr_inerval_max;
+    for (const auto& [key, iter] : bash.GetSearchMap()) {
+        if (firstIter) {
+            prev_inerval_min = iter->interval_min;
+            prev_inerval_max = iter->interval_max;
+            
+            if (key != prev_inerval_min) {
+                return testing::AssertionFailure() << "prev_inerval_min = " << prev_inerval_min
+                                                   << " key = " << key; 
+            }
 
-std::ostream& operator<<(std::ostream& out, const BASHBuilderTestAdapter::BarsMap& m) {
-    out << "PIPIP";
-    return out;
+            firstIter = false;
+            continue;
+        } 
+           
+        
+        curr_inerval_min = iter->interval_min;
+        curr_inerval_max = iter->interval_max;
+
+
+        if (key != curr_inerval_min) {
+            return testing::AssertionFailure() << "key != curr_inerval_min: key = " << key
+                                               << " curr_inerval_min = " << curr_inerval_min; 
+        }
+
+        if (key != prev_inerval_max) {
+            return testing::AssertionFailure() << "key != prev_inerval_max: key = " << key
+                                               << " prev_inerval_max = " << prev_inerval_max;
+        }
+       
+        prev_inerval_min = curr_inerval_min;
+        prev_inerval_max = curr_inerval_max;
+    }
+    return testing::AssertionSuccess(); 
 }
 
-} // namespace vsh
 
 TEST(BASH, Adding) {
     BASHBuilderTestAdapter bash(5);
-
-    for (int i = 0; i < 10000; i++) {
-        ASSERT_NO_FATAL_FAILURE(bash.InsertValue(i));
+    for (int i = 0; i < 1'000'000; i++) {
+        ASSERT_NO_FATAL_FAILURE(bash.Tick()) << " fail at iter " << i;
+        ASSERT_NO_FATAL_FAILURE(bash.InsertValue(i)) << " fail at iter " << i;
+        EXPECT_TRUE(HasConsistentIndex(bash)) << " fail at iter " << i;
     }
+
 }
