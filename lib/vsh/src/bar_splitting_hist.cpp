@@ -373,8 +373,13 @@ HistType BarSplittingHistBuilder::Build() {
 }
 
 void BarSplittingHistBuilder::Tick() {
-    for (Bar& bar : bars_) {
-        bar.eh.Tick();
+     for (auto it = bars_.begin(); it != bars_.end();) {
+        it -> eh.Tick();
+        if (it -> is_blocked && it -> eh.Count() == 0) {
+            it = bars_.erase(it); 
+            continue;
+        }
+        it++;
     }
 }
 
