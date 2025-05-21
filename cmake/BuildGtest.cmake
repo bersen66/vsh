@@ -10,6 +10,7 @@ if (NOT EXISTS "${EXTERN_DIR}/gtest/lib/cmake")
             -S ${GTEST_SOURCES_DIR}
             -B ${GTEST_BUILD_DIR}
             -DCMAKE_INSTALL_PREFIX=${GTEST_INSTALL_DIR}
+            -DCMAKE_BUILD_TYPE=Release
         RESULT_VARIABLE result
     )
 

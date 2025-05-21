@@ -1,4 +1,4 @@
-#include "vsh/bar_splitting_hist.hpp"
+#include <vsh/bar_splitting_hist.hpp>
 #include <cstdlib>
 #include <iostream>
 
@@ -40,7 +40,7 @@ arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
     std::size_t one_percent = iter.StreamSize().value() / 100;
 #endif // ALLOW_INDICATORS
 
-    auto h = vsh::BarSplittingHistBuilder(9, 4.f, 100, 100'000);
+    auto h = vsh::BarSplittingHistBuilder(9, 4.f, 100, 100);
 
     for(auto conv = iter.ValuesAdapter(); iter.HasNext(); iter.StepForward()) {
 #ifdef ALLOW_INDICATORS

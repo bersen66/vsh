@@ -17,13 +17,16 @@ include(VshOptions)
 include(PrepareExternDir)
 include(BuildArrow)
 include(BuildDatasketches)
-
 include(Sanitizers)
 
 if (VSH_BUILD_TESTS)
     include(BuildGtest)
     enable_testing()
     include(GoogleTest)
+endif()
+
+if (VSH_BUILD_BENCHMARKS)
+    include(BuildBenchmark)
 endif()
 
 add_subdirectory(lib)

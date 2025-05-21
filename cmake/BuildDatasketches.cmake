@@ -12,7 +12,8 @@ if (NOT EXISTS "${DATASKETCHES_INSTALL_DIR}/lib/DataSketches/cmake/")
             -S ${DATASKETCHES_SOURCES_DIR}
             -B ${DATASKETCHES_BUILD_DIR}
             -DCMAKE_INSTALL_PREFIX=${DATASKETCHES_INSTALL_DIR}
-            -DBUILD_TESTS=OFF
+            -DCMAKE_BUILD_TYPE=Release
+            -DBUILD_TESTS=OFF 
         RESULT_VARIABLE result
     )
 

@@ -13,6 +13,7 @@ if (NOT EXISTS "${EXTERN_DIR}arrow/lib/cmake/Arrow/" AND
           -S ${ARROW_SOURCES_DIR}    
           -B ${ARROW_BUILD_DIR}
           -DCMAKE_INSTALL_PREFIX=${ARROW_INSTALL_DIR}
+          -DCMAKE_BUILD_TYPE=Release
           -DARROW_BUILD_STATIC=ON
           -DARROW_PARQUET=ON
           -DARROW_CSV=OFF  
