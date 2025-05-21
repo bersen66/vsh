@@ -1,3 +1,6 @@
 
 add_subdirectory(vsh)
-add_subdirectory(driver)
+
+if (VSH_BUILD_DRIVER) 
+    add_subdirectory(driver)
+endif()

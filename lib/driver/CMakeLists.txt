@@ -4,4 +4,5 @@ target_link_libraries(
     vsh
     Arrow::arrow_static
     Parquet::parquet_static
+    indicators::indicators
 )

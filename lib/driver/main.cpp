@@ -6,7 +6,6 @@
 #include <vsh/key_iterator.hpp>
 #include <vsh/histogram.hpp>
 #include <vsh/quantile_hist.hpp>
-
 //#define ALLOW_INDICATORS
 #ifdef ALLOW_INDICATORS
 #include "indicators.hpp"

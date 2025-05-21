@@ -19,6 +19,10 @@ include(BuildArrow)
 include(BuildDatasketches)
 include(Sanitizers)
 
+if (VSH_BUILD_DRIVER)
+    include(BuildIndicators)
+endif()
+
 if (VSH_BUILD_TESTS)
     include(BuildGtest)
     enable_testing()

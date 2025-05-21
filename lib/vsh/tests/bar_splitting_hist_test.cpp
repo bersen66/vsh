@@ -64,7 +64,7 @@ testing::AssertionResult HasConsistentIndex(const BASHBuilderTestAdapter& bash) 
 
 
 TEST(BASH, Adding) {
-    BASHBuilderTestAdapter bash(5);
+    BASHBuilderTestAdapter bash(5, 2, 50, 1000);
     for (int i = 0; i < 1'000'000; i++) {
         ASSERT_NO_FATAL_FAILURE(bash.Tick()) << " fail at iter " << i;
         ASSERT_NO_FATAL_FAILURE(bash.InsertValue(i)) << " fail at iter " << i;
