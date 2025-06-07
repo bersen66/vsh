@@ -392,64 +392,56 @@ void BarSplittingHistBuilder::HandleIteration(KeyIterator& iter, TypeAdapter& co
 } 
 
 HistType BarSplittingHistBuilder::Build() {
-    HistType result;
-    result.reserve(buckets_num_);
-    
-    std::uint64_t count = 0; 
-    BarIter bar_iter = bars_.begin();
+    HistType boundaries;
+    boundaries.reserve(buckets_num_ - 1);
 
-    std::uint64_t ideal_bucket_size = elements_visited_ / buckets_num_;
-
-    for (std::size_t i = 0; i < buckets_num_; i++) {
-        auto next = bar_iter;
-
-        while (next != bars_.end()) {
-            Bar& b = *next;
-            count+=b.eh.Count();
-            if (count <= ideal_bucket_size) {
-                break;
-            }
-            next++;
-        } 
-
-        if (next == bars_.end()) {
-            result.push_back(bar_iter->interval_min);
-            break;
-        }
-        bar_iter = next;
-        Bar& b = *bar_iter;
-
-        std::uint64_t surplus = count - ideal_bucket_size;
-        double len = b.interval_max - b.interval_min;
-
-        result.push_back(b.interval_min + len * ((double)surplus/(double)b.eh.Count()));
-        count = surplus;
+    std::size_t total_count = 0;
+    for (Bar& bar : bars_) {
+        total_count += bar.eh.Count();
+    }
+    if (total_count == 0) {
+        return boundaries;
     }
 
-    std::sort(result.begin(), result.end());
-    result.erase(std::unique(result.begin(), result.end()), result.end());
-    return result;
+    const double ideal_bucket_size = static_cast<double>(total_count) / buckets_num_;
+    double accumulated_count = 0.0;
+    auto bar_iter = bars_.begin();
+
+    for (std::size_t i = 0; i < buckets_num_ - 1; ++i) {
+        while (bar_iter != bars_.end() && accumulated_count <= ideal_bucket_size) {
+            accumulated_count += bar_iter->eh.Count();
+            ++bar_iter;
+        }
+
+        if (bar_iter == bars_.end()) {
+            break;
+        }
+
+        --bar_iter;
+        const double surplus = accumulated_count - ideal_bucket_size;
+        const double bar_count = bar_iter->eh.Count();
+        const double bar_length = bar_iter->interval_max - bar_iter->interval_min;
+
+        const double boundary = bar_iter->interval_min + bar_length * (1 - surplus / bar_count);
+        boundaries.push_back(boundary);
+
+        accumulated_count = surplus;
+        ++bar_iter; 
+    }
+
+    std::sort(boundaries.begin(), boundaries.end());
+    boundaries.erase(std::unique(boundaries.begin(), boundaries.end()), boundaries.end());
+    return boundaries;
 }
 
 void BarSplittingHistBuilder::Tick() {
-     // for (auto it = bars_.begin(); it != bars_.end();) {
-     //    it -> eh.Tick();
-     //    if (it -> is_blocked && it -> eh.Count() == 0) {
-     //        it = bars_.erase(it); 
-     //        continue;
-     //    }
-     //    it++;
-    for (auto bar_it = bars_.begin(); bar_it != bars_.end();) {
-        EHSketch& eh = bar_it->eh;
-
-        if (bar_it->is_blocked && eh.Count() == 0) {
-            bar_it = bars_.erase(bar_it); 
+    for (auto it = bars_.begin(); it != bars_.end();) {
+        it -> eh.Tick();
+        if (it -> is_blocked && it -> eh.Count() == 0) {
+            it = bars_.erase(it); 
             continue;
         }
-
-        eh.Tick();
-
-        bar_it++;
+        it++;
     }
 }
 
