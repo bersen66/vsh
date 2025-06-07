@@ -4,3 +4,4 @@ build
 devbuild
 cmake-build-debug
 cmake-build-release
+distributions.parquet

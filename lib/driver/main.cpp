@@ -1,12 +1,12 @@
 #include <limits>
 #include <memory>
+#include <memory_resource>
 #include <stdexcept>
 #include <vsh/bar_splitting_hist.hpp>
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
 #include <unistd.h>
-#include <iterator>
 #include <vsh/key_iterator.hpp>
 #include <vsh/histogram.hpp>
 #include <vsh/quantile_hist.hpp>
@@ -44,7 +44,11 @@ const char* ValidatePath(const char* path) {
 }
 
 arrow::Status ProcessUsingBASH(vsh::ParquetKeyIterator& iter, vsh::ConsumerList& consumers) {
-    vsh::BarSplittingHistBuilder histBuilder(flagNumberOfPartitions, 4.f, 500, 500);
+    std::array<std::byte, 1 << 20> buffer;
+    std::pmr::monotonic_buffer_resource local_pool{
+        buffer.data(), buffer.size()
+    };
+    vsh::BarSplittingHistBuilder histBuilder(&local_pool, flagNumberOfPartitions, 4.f, 500, 500);
 
     for(auto conv = iter.ValuesAdapter(); iter.HasNext(); iter.StepForward()) {
         histBuilder.HandleIteration(iter, *conv);
@@ -52,11 +56,10 @@ arrow::Status ProcessUsingBASH(vsh::ParquetKeyIterator& iter, vsh::ConsumerList&
 
     auto hist = vsh::MakeEquiDepthHistogram(histBuilder, iter);
 
-    for (const auto& v : hist) {
-        std::printf("%f ", v);
-    }
-    std::printf("\n");
-    hist.push_back(std::numeric_limits<double>::max());
+    // for (const auto& v : hist) {
+    //     std::printf("%f ", v);
+    // }
+    // std::printf("\n");
 
     ARROW_ASSIGN_OR_RAISE(auto itr, vsh::ParquetKeyIterator::OverFile(flagPathToDataset, flagColumnIdx));
     auto conv = itr.ValuesAdapter();
@@ -191,5 +194,4 @@ int main(int argc, char** argv) {
 
     return EXIT_SUCCESS;
 }
-
 

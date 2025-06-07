@@ -37,11 +37,13 @@ bool BarSplittingHistBuilder::EmptyBar(BarIter it) const {
     return AggregateSize(it) == 0;
 }
 
-BarSplittingHistBuilder::BarSplittingHistBuilder(std::uint64_t buckets_num,
+BarSplittingHistBuilder::BarSplittingHistBuilder(std::pmr::memory_resource* resource,
+                                                 std::uint64_t buckets_num,
                                                  double scaling_factor,
                                                  std::uint64_t eh_sketch_precision,
                                                  std::uint64_t window_size)
-    : eh_sketch_precision_(eh_sketch_precision) 
+    : mem_resource_(resource)
+    , eh_sketch_precision_(eh_sketch_precision) 
     , window_size_(window_size)
     , elements_visited_(0)
     , buckets_num_(buckets_num)
@@ -102,7 +104,7 @@ BarIter BarSplittingHistBuilder::FindOrCreateBarFor(double value) {
     if (add_front) {
         double curr_min = bars_.front().interval_min;
         bars_.push_front(Bar{
-            .eh=EHSketch(eh_sketch_precision_, window_size_),
+            .eh=EHSketch(mem_resource_, eh_sketch_precision_, window_size_),
             .interval_min=value,
             .interval_max=bars_.empty() ? value : curr_min,
             .is_blocked=false
@@ -205,7 +207,7 @@ bool BarSplittingHistBuilder::FindAndMergeBars(std::size_t max_bar_size) {
     Bar& X_l = *left_bar_it;
     Bar& X_r = *right_bar_it;
 
-    EHSketch result_eh;
+    EHSketch result_eh{mem_resource_};
     double   result_min;
     double   result_max;
     BarIter  result_pos;
@@ -273,8 +275,8 @@ void BarSplittingHistBuilder::SplitBar(BarIter it, double Sm, std::size_t max_ba
     std::size_t size = split_bar.eh.Count();
     std::size_t aggregated_size = AggregateSize(it) - size;
 
-    std::list<Bar> X_l_blocked; 
-    std::list<Bar> X_r_blocked;
+    BarList X_l_blocked{mem_resource_}; 
+    BarList X_r_blocked{mem_resource_};
     std::size_t cnt = 0;
 
     // Distribute blocked bars between X_l and X_r
@@ -297,14 +299,14 @@ void BarSplittingHistBuilder::SplitBar(BarIter it, double Sm, std::size_t max_ba
 
     // Init split bars
     Bar l{
-        .eh = EHSketch(eh_sketch_precision_, window_size_),
+        .eh = EHSketch(mem_resource_, eh_sketch_precision_, window_size_),
         .interval_min = split_bar.interval_min,
         .interval_max = interval_mid,
         .is_blocked = false
     };
 
     Bar r{
-        .eh = EHSketch(eh_sketch_precision_, window_size_),
+        .eh = EHSketch(mem_resource_, eh_sketch_precision_, window_size_),
         .interval_min=interval_mid,
         .interval_max=split_bar.interval_max,
         .is_blocked=false,
@@ -383,7 +385,7 @@ void BarSplittingHistBuilder::InsertIntoBar(double value) {
         SplitBar(bar_it, Sm, max_bucket_size);      
     }
     elements_visited_++;
-    printf("%f\n", value);
+    // printf("%f\n", value);
 }
 
 void BarSplittingHistBuilder::HandleIteration(KeyIterator& iter, TypeAdapter& conv) {
