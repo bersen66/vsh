@@ -24,6 +24,7 @@ public:
     using BarList = std::list<Bar>;
     using BarIter = BarList::iterator;
     using BarSearchMap = std::map<double, BarIter>;
+    using BarIndexIter = std::map<double, BarIter>::iterator;
 
     [[nodiscard]]std::size_t AggregateSize(BarIter it) const;
     
@@ -79,6 +80,7 @@ protected:
     std::uint64_t elements_visited_;
     std::uint64_t buckets_num_;
     double scaling_factor_;
+    bool is_first_iter_;
 };
 
 } // namespace vsh

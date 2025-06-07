@@ -14,3 +14,10 @@ static void BM_EhSketchCount(benchmark::State& state) {
 }
 
 BENCHMARK(BM_EhSketchCount) -> Range(1, 1'000'000);
+
+
+static void BM_EhSketchTickIncrement(benchmark::State& state) {
+    vsh::EHSketch eh(/*precision=*/30, /*window_size=*/200 );
+}
+
+BENCHMARK(BM_EhSketchCount) -> Range(1, 1'000'000);

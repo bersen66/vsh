@@ -36,7 +36,7 @@ public:
     void Compress();
     void ExcludeExpiredBoxes();
 
-    std::uint64_t Count() const noexcept;
+    std::uint64_t Count() noexcept;
 
     void Tick();
 
@@ -55,6 +55,18 @@ public:
     std::list<Box>& Boxes() {
         return boxes_;
     }
+
+    const std::list<Box>& Boxes() const {
+        return boxes_;
+    }
+
+    std::uint64_t Precision() const noexcept {
+        return precision_;
+    }
+
+    std::uint64_t WindowSize() const noexcept {
+        return window_size_;
+    }
 protected:
     
     // Functionality for reusing already allocated boxes;
@@ -69,6 +81,7 @@ protected:
     std::uint64_t current_time_;
     std::uint64_t window_size_;
     std::uint64_t precision_;
+    std::uint64_t curr_size_;
     double box_threshold_;
 };
 

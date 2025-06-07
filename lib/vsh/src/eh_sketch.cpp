@@ -19,6 +19,7 @@ EHSketch::EHSketch(std::uint64_t precision, std::uint64_t window_size)
     : current_time_(0)
     , window_size_(window_size)
     , precision_(precision)
+    , curr_size_(0)
     , box_threshold_((static_cast<double>(precision_) / 2.f) + 2)
 {}
 
@@ -26,7 +27,6 @@ void EHSketch::Compress() {
     using IterType = std::list<Box>::iterator;
     
     IterType curr = boxes_.begin();
-
     while (curr != boxes_.end()) {
         std::size_t range_len = 0;
         IterType next = curr;
@@ -78,29 +78,25 @@ EHSketch::EraseBox(std::list<Box>& dst, std::list<Box>& src, std::list<Box>::ite
 
 void EHSketch::Increment() {
     Box& box = GetBox(boxes_, deleted_boxes_);
+
     box.count = 1;
     box.interval_start = current_time_;
     box.interval_finish = current_time_;
+    curr_size_++;
 
     ExcludeExpiredBoxes();
     Compress();
+
 }
 
-std::uint64_t EHSketch::Count() const noexcept {
-    std::uint64_t result = 0;
-
-    for (const auto& box : boxes_) {
-        if (IsExpiredBox(box)) {
-            continue;
-        }
-        result += box.count; 
-    } 
-
-    return result;
+std::uint64_t EHSketch::Count() noexcept {
+    return curr_size_;
 }
 
 void EHSketch::Tick() {
     current_time_++;
+    Compress();
+    ExcludeExpiredBoxes();
 }
 
 } // namespace vsh

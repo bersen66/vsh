@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <utility>
 
 #include <vsh/eh_sketch.hpp>
@@ -19,10 +20,17 @@ bool BarSplittingHistBuilder::NeedSplit(BarIter it, std::size_t max_size) const 
      return AggregateSize(it) > max_size;
 }
 
-void AppendBar(Bar& bar, double value) {
-    bar.interval_min = std::min(bar.interval_min, value);
-    bar.interval_max = std::max(bar.interval_max, value);
+static void AppendBar(Bar& bar, double value, bool& is_first_iteration) {
+    if (is_first_iteration) {
+        bar.interval_min = value;
+        bar.interval_max = value;
+    } else {
+        bar.interval_min = std::min(bar.interval_min, value);
+        bar.interval_max = std::max(bar.interval_max, value);
+    }
+
     bar.eh.Increment();
+    is_first_iteration = false;
 }
 
 bool BarSplittingHistBuilder::EmptyBar(BarIter it) const {
@@ -38,6 +46,7 @@ BarSplittingHistBuilder::BarSplittingHistBuilder(std::uint64_t buckets_num,
     , elements_visited_(0)
     , buckets_num_(buckets_num)
     , scaling_factor_(scaling_factor)
+    , is_first_iter_(true)
 {}
 
 std::size_t BarSplittingHistBuilder::AggregateSize(BarIter start) const {
@@ -56,22 +65,56 @@ std::size_t BarSplittingHistBuilder::AggregateSize(BarIter start) const {
 }
 
 BarIter BarSplittingHistBuilder::FindOrCreateBarFor(double value) {
-    auto it  = search_map_.lower_bound(value);
-  
-    if (it == search_map_.begin()) {
+    // TODO: optimize
+    BarIndexIter it;
+    bool add_front = search_map_.empty();
+    bool add_back = false;
+    bool exact_match = false;
 
-        if (bars_.empty() || bars_.front().interval_min >= value) {
-            bars_.push_front(Bar{EHSketch(eh_sketch_precision_, window_size_), 0, 0, false});
-            search_map_[value] = bars_.begin();
-            return bars_.begin();
+    for (it = search_map_.begin(); it != search_map_.end(); it++) {
+        const auto& [key, bar] = *it;
+
+        // Exact match of interval
+        if (bar->interval_min <= value && value < bar->interval_max) {
+            exact_match = true;
+            break;
         }
 
+        // Value less than all of values before
+        if (bar->interval_min > value) {
+            add_front = true;
+            break;
+        }
+
+        // Value bigger than all of values before
+        if (std::next(it) == search_map_.end()) {
+            add_back = true;
+            break;
+        } 
+
+    }
+
+    if (exact_match) {
+        return it->second;
+    }
+ 
+        
+    if (add_front) {
+        double curr_min = bars_.front().interval_min;
+        bars_.push_front(Bar{
+            .eh=EHSketch(eh_sketch_precision_, window_size_),
+            .interval_min=value,
+            .interval_max=bars_.empty() ? value : curr_min,
+            .is_blocked=false
+        });
+        search_map_[value] = bars_.begin();
         return bars_.begin();
     }
+
     
     // return last bar
-    if (it == search_map_.end()) {
-        return std::prev(it)->second;
+    if (add_back) {
+        return it->second;
     }
 
     return it->second;
@@ -152,8 +195,6 @@ std::pair<BarIter, BarIter> BarSplittingHistBuilder::FindAdjacentBarsToMerge(std
     }
     return std::make_pair(bars_.end(), bars_.end());
 }
-
-
 
 bool BarSplittingHistBuilder::FindAndMergeBars(std::size_t max_bar_size) {
     auto [left_bar_it, right_bar_it] = FindAdjacentBarsToMerge(max_bar_size);    
@@ -241,10 +282,12 @@ void BarSplittingHistBuilder::SplitBar(BarIter it, double Sm, std::size_t max_ba
         std::size_t curr_size = curr->eh.Count();
         auto next = std::next(curr);
         if (cnt + curr_size < (aggregated_size/2)) {
-            X_l_blocked.splice(std::prev(X_l_blocked.end()), bars_, curr);
+            // X_l_blocked.splice(std::prev(X_l_blocked.end()), bars_, curr);
+            X_l_blocked.splice(X_l_blocked.end(), bars_, curr);
             cnt += curr_size;
         } else {
-            X_r_blocked.splice(std::prev(X_r_blocked.end()), bars_, curr);
+            X_r_blocked.splice(X_r_blocked.end(), bars_, curr);
+            // X_r_blocked.splice(std::prev(X_r_blocked.end()), bars_, curr);
         }
 
         curr = next;
@@ -277,10 +320,8 @@ void BarSplittingHistBuilder::SplitBar(BarIter it, double Sm, std::size_t max_ba
         if (b.count == 1) {
             if (add_to_l) {
                 l.eh.Boxes().push_back(b);
-                l.eh.Compress();
             } else {
                 r.eh.Boxes().push_back(b);
-                r.eh.Compress();
             }
             add_to_l = !add_to_l;
             continue;
@@ -293,14 +334,14 @@ void BarSplittingHistBuilder::SplitBar(BarIter it, double Sm, std::size_t max_ba
 
             if ((rSize / (lSize + rSize)) < ratio) {
                 r.eh.Boxes().push_back(b);
-                r.eh.Compress();
             } else {
                 l.eh.Boxes().push_back(b);
-                l.eh.Compress();
             }
         }
     }  
-    
+
+    r.eh.Compress(); 
+    l.eh.Compress();
 
     auto l_iter = bars_.insert(it, std::move(l));
     auto r_iter = bars_.insert(it, std::move(r));
@@ -314,21 +355,39 @@ void BarSplittingHistBuilder::SplitBar(BarIter it, double Sm, std::size_t max_ba
 }
 
 void BarSplittingHistBuilder::InsertIntoBar(double value) {
-    elements_visited_++;
-    auto bar_map_it = FindOrCreateBarFor(value);
-    Bar& related_bar = *bar_map_it;
-    AppendBar(related_bar, value);
+    auto bar_it = FindOrCreateBarFor(value);
+    Bar& related_bar = *bar_it;
+    BarIndexIter index_node = search_map_.find(related_bar.interval_min);
+
+    AppendBar(related_bar, value, is_first_iter_);
+
+    // We need to restore index consistency
+    if (related_bar.interval_min < index_node->first) {
+        double curr_key = index_node->first;
+        double prev_range_max = 0;
+
+        if (index_node == search_map_.begin()) {
+            prev_range_max = std::numeric_limits<double>::max();
+        } else {
+            prev_range_max = std::prev(index_node)->second->interval_max;
+        }
+
+        search_map_.erase(curr_key);
+        search_map_[std::min({related_bar.interval_min, prev_range_max, value})] = bar_it;
+    } 
 
     double Sm = static_cast<double>(buckets_num_) * scaling_factor_;
     std::uint64_t max_bucket_size = std::round(kMaxCoef * (static_cast<double>(elements_visited_) / Sm));
 
-    if (max_bucket_size && NeedSplit(bar_map_it, max_bucket_size)) {
-        SplitBar(bar_map_it, Sm, max_bucket_size);      
+    if (max_bucket_size && NeedSplit(bar_it, max_bucket_size)) {
+        SplitBar(bar_it, Sm, max_bucket_size);      
     }
+    elements_visited_++;
+    printf("%f\n", value);
 }
 
 void BarSplittingHistBuilder::HandleIteration(KeyIterator& iter, TypeAdapter& conv) {
-//    Tick();
+    Tick();
     InsertIntoBar(conv.AsDouble(iter.Value()));
 } 
 
@@ -373,13 +432,24 @@ HistType BarSplittingHistBuilder::Build() {
 }
 
 void BarSplittingHistBuilder::Tick() {
-     for (auto it = bars_.begin(); it != bars_.end();) {
-        it -> eh.Tick();
-        if (it -> is_blocked && it -> eh.Count() == 0) {
-            it = bars_.erase(it); 
+     // for (auto it = bars_.begin(); it != bars_.end();) {
+     //    it -> eh.Tick();
+     //    if (it -> is_blocked && it -> eh.Count() == 0) {
+     //        it = bars_.erase(it); 
+     //        continue;
+     //    }
+     //    it++;
+    for (auto bar_it = bars_.begin(); bar_it != bars_.end();) {
+        EHSketch& eh = bar_it->eh;
+
+        if (bar_it->is_blocked && eh.Count() == 0) {
+            bar_it = bars_.erase(bar_it); 
             continue;
         }
-        it++;
+
+        eh.Tick();
+
+        bar_it++;
     }
 }
 

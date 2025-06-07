@@ -77,15 +77,15 @@ bool ParquetKeyIterator::HasNext() const {
 
 bool ParquetKeyIterator::StepForward() {
 
-    parquet::Int64Reader* concrete_reader = static_cast<parquet::Int64Reader*>(col_reader_.get());
+    parquet::DoubleReader* concrete_reader = static_cast<parquet::DoubleReader*>(col_reader_.get());
     while (!concrete_reader->HasNext()) {
         current_row_group_++;
         rg_reader_ = file_reader_->parquet_reader()->RowGroup(current_row_group_);
         col_reader_ = rg_reader_->Column(key_column_idx_);
-        concrete_reader = static_cast<parquet::Int64Reader*>(col_reader_.get());
+        concrete_reader = static_cast<parquet::DoubleReader*>(col_reader_.get());
     }
 
-    int64_t data;
+    double data;
     int64_t values_read;
     ARROW_UNUSED(values_read);
     int64_t rows_readed = concrete_reader->ReadBatch(1, nullptr, nullptr, &data, &values_read);
