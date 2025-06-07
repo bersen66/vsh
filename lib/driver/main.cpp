@@ -146,7 +146,7 @@ arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
 
 inline void PrintHelpMessage() {
     std::cerr << R"help_message(
-Usage: ./driver <algo> <file> <number_of_partitions>
+Usage: ./driver <algo> <file> <number_of_partitions> <dataset_column>
     * algo                 -- supported values: "hash", "quantiles", "bash"
     * file                 -- path to dataset
     * number_of_partitions -- must be positive integer
