@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <chrono>
+#include <cstddef>
+#include <limits>
 #include <memory>
 #include <memory_resource>
 #include <stdexcept>
@@ -23,6 +26,7 @@ SupportedAlgo flagAlgorithm;
 const char*   flagPathToDataset;
 std::size_t   flagNumberOfPartitions;
 std::size_t   flagColumnIdx = 0;
+std::size_t   gFileSize = 0;  
 
 SupportedAlgo AlgoFromString(const char* arg) {
     if(std::strcmp(arg,"hash") == 0) {
@@ -63,7 +67,7 @@ arrow::Status ProcessUsingBASH(vsh::ParquetKeyIterator& iter, vsh::ConsumerList&
     std::pmr::monotonic_buffer_resource local_pool{
         buffer.data(), buffer.size()
     };
-    vsh::BarSplittingHistBuilder histBuilder(&local_pool, flagNumberOfPartitions, 4.f, 20, 5000);
+    vsh::BarSplittingHistBuilder histBuilder(&local_pool, flagNumberOfPartitions, 5.f, 10, 5000);
     auto hist = vsh::MakeEquiDepthHistogram(histBuilder, iter);
     return DistributeValues(hist, consumers);
 }
@@ -90,6 +94,7 @@ arrow::Status ProcessUsingHash(vsh::KeyIterator& iter, vsh::ConsumerList& consum
 
 arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
     ARROW_ASSIGN_OR_RAISE(auto iter, vsh::ParquetKeyIterator::OverFile(file, flagColumnIdx));
+    gFileSize = iter.StreamSize().value();
 
     switch(flagAlgorithm) {
         case SupportedAlgo::kBASH:      return ProcessUsingBASH(iter, consumers);
@@ -98,6 +103,38 @@ arrow::Status Creation(const std::string& file, vsh::ConsumerList& consumers) {
     }
 
     return arrow::Status::OK();
+}
+
+struct DistributionMetrics {
+    long double rmse;
+    long double max_deviation;
+    long double max_relative_error;
+    long double ideal_load;
+};
+
+DistributionMetrics EvaluateDistributionMetrics(const vsh::ConsumerList& consumers) {
+    DistributionMetrics metrics{
+        .rmse = 0,
+        .max_deviation = (consumers.empty() ? 0 : std::numeric_limits<double>::min()),
+        .max_relative_error = 0,
+        .ideal_load = (long double)gFileSize/(long double)flagNumberOfPartitions,
+    };
+
+    for (std::size_t i = 0; i < consumers.size(); i++) {
+        auto consumer_ptr = std::dynamic_pointer_cast<vsh::LoadStatisticsAccumulator>(consumers[i]);
+
+        // std::printf("Consumer %ld): %ld\n", i, consumer_ptr->rows_processed_);
+
+        long double deviation = std::abs(metrics.ideal_load - consumer_ptr->rows_processed_);
+
+        metrics.max_deviation = std::max(metrics.max_deviation, deviation);
+        metrics.max_relative_error = std::max(metrics.max_relative_error, deviation / metrics.ideal_load);
+        metrics.rmse += deviation * deviation;
+    }
+
+    metrics.rmse = std::sqrt(metrics.rmse / consumers.size());
+
+    return metrics;
 }
 
 inline void PrintHelpMessage() {
@@ -136,18 +173,18 @@ int main(int argc, char** argv) {
     }
 
     auto consumers = vsh::ConstructConsumers<vsh::LoadStatisticsAccumulator>(flagNumberOfPartitions); 
+    
+    auto start = std::chrono::high_resolution_clock::now();
     arrow::Status res = Creation(flagPathToDataset, consumers);
+    auto end= std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     if (!res.ok()) {
         std::cerr << res << std::endl;
         return EXIT_FAILURE;
     }
 
-
-    for (const auto& consumer_ptr : consumers) {
-        auto c = std::dynamic_pointer_cast<vsh::LoadStatisticsAccumulator>(consumer_ptr);
-        std::cout << c->rows_processed_ << "\n";
-    }
-
+    auto [rmse, max_deviation, max_relative_error, ideal_load] = EvaluateDistributionMetrics(consumers);
+    std::printf("%Lf %Lf %Lf %ld", rmse, max_deviation, max_relative_error, duration); 
     return EXIT_SUCCESS;
 }
 

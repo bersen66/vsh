@@ -9,6 +9,8 @@ def generate_dataset(flags):
         'normal_low_scale': np.random.normal(loc=5, scale=2, size=flags.rows_number),
         'normal_mid_scale': np.random.normal(loc=0.0, scale=100_000, size=flags.rows_number),
         'normal_high_scale':np.random.normal(loc=0.0, scale=1_000_000, size=flags.rows_number),
+        'normal_extra_high_scale':np.random.normal(loc=0.0, scale=1_000_000_000, size=flags.rows_number),
+        'small set': np.random.choice([1.1, 2.2, 3.3, 4.4], size=flags.rows_number)
     })
 
     df.to_parquet(flags.filename, compression=None)
