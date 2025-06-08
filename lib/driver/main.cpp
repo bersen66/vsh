@@ -1,4 +1,4 @@
-#include <limits>
+#include <algorithm>
 #include <memory>
 #include <memory_resource>
 #include <stdexcept>
@@ -43,79 +43,35 @@ const char* ValidatePath(const char* path) {
     throw std::runtime_error("Invalid file: " + std::string(path));
 }
 
+arrow::Status DistributeValues(const vsh::HistType& hist, vsh::ConsumerList& consumers) {
+
+    ARROW_ASSIGN_OR_RAISE(auto itr, vsh::ParquetKeyIterator::OverFile(flagPathToDataset, flagColumnIdx));
+    auto conv = itr.ValuesAdapter();
+    for (int i = 0; itr.HasNext(); itr.StepForward()) {
+        auto v = conv->AsDouble(itr.Value());
+
+        std::size_t consumer_idx = std::lower_bound(hist.begin(), hist.end(), v) - hist.begin();
+        consumers[consumer_idx]->Consume(itr.Value());
+    }
+
+
+    return arrow::Status::OK();
+}
+
 arrow::Status ProcessUsingBASH(vsh::ParquetKeyIterator& iter, vsh::ConsumerList& consumers) {
     std::array<std::byte, 1 << 20> buffer;
     std::pmr::monotonic_buffer_resource local_pool{
         buffer.data(), buffer.size()
     };
-    vsh::BarSplittingHistBuilder histBuilder(&local_pool, flagNumberOfPartitions, 4.f, 500, 500);
-
-    for(auto conv = iter.ValuesAdapter(); iter.HasNext(); iter.StepForward()) {
-        histBuilder.HandleIteration(iter, *conv);
-    }
-
+    vsh::BarSplittingHistBuilder histBuilder(&local_pool, flagNumberOfPartitions, 4.f, 20, 5000);
     auto hist = vsh::MakeEquiDepthHistogram(histBuilder, iter);
-
-    // for (const auto& v : hist) {
-    //     std::printf("%f ", v);
-    // }
-    // std::printf("\n");
-
-    ARROW_ASSIGN_OR_RAISE(auto itr, vsh::ParquetKeyIterator::OverFile(flagPathToDataset, flagColumnIdx));
-    auto conv = itr.ValuesAdapter();
-    for (int i = 0; itr.HasNext(); itr.StepForward()) {
-        auto v = conv->AsDouble(itr.Value());
-
-        std::size_t consumer_idx = 0;
-
-        for (int i = 0; i+1 < hist.size(); i++) {
-            if (hist[i] <= v && hist[i+1] > v) {
-                consumer_idx = i;
-                break;
-            }
-            
-        }
-
-        consumers[consumer_idx]->Consume(iter.Value());
-    }
-    
-    return arrow::Status::OK();
+    return DistributeValues(hist, consumers);
 }
 
 arrow::Status ProcessUsingQuantiles(vsh::ParquetKeyIterator& iter, vsh::ConsumerList& consumers) {
     vsh::QuantileHistBuilder histBuilder(flagNumberOfPartitions);
-
-    for(auto conv = iter.ValuesAdapter(); iter.HasNext(); iter.StepForward()) {
-        histBuilder.HandleIteration(iter, *conv);
-    }
-
     auto hist = vsh::MakeEquiDepthHistogram(histBuilder, iter);
-
-    for (const auto& v : hist) {
-        std::printf("%f ", v);
-    }
-    std::printf("\n");
-    hist.push_back(std::numeric_limits<double>::max());
-
-    ARROW_ASSIGN_OR_RAISE(auto itr, vsh::ParquetKeyIterator::OverFile(flagPathToDataset, flagColumnIdx));
-    auto conv = itr.ValuesAdapter();
-    for (int i = 0; itr.HasNext(); itr.StepForward()) {
-        auto v = conv->AsDouble(itr.Value());
-
-        std::size_t consumer_idx = 0;
-
-        for (int i = 0; i+1 < hist.size(); i++) {
-            if (hist[i] <= v && hist[i+1] > v) {
-                consumer_idx = i;
-                break;
-            }
-            
-        }
-
-        consumers[consumer_idx]->Consume(iter.Value());
-    }
-    
-    return arrow::Status::OK();
+    return DistributeValues(hist, consumers);
 }
 
 arrow::Status ProcessUsingHash(vsh::KeyIterator& iter, vsh::ConsumerList& consumers) {

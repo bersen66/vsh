@@ -395,7 +395,7 @@ void BarSplittingHistBuilder::HandleIteration(KeyIterator& iter, TypeAdapter& co
 
 HistType BarSplittingHistBuilder::Build() {
     HistType boundaries;
-    boundaries.reserve(buckets_num_ - 1);
+    boundaries.reserve(buckets_num_ + 1);
 
     std::size_t total_count = 0;
     for (Bar& bar : bars_) {
