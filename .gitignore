@@ -4,3 +4,7 @@ build
 devbuild
 cmake-build-debug
 cmake-build-release
+<<<<<<< HEAD
+=======
+distributions.parquet
+>>>>>>> dev

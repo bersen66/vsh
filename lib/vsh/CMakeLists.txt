@@ -35,6 +35,18 @@ if (VSH_BUILD_TESTS)
     gtest_discover_tests(vsh_tests)
 endif()
 
+if (VSH_BUILD_BENCHMARKS)
 
+    set (
+        VSH_BENCHMARK_SOURCES
+        benchmarks/eh_sketch_bench.cpp
+    )
+    
+    add_executable(vsh_bench ${VSH_BENCHMARK_SOURCES})
+    target_link_libraries(vsh_bench 
+        vsh
+        benchmark::benchmark_main
+    )
+endif()
 
 

@@ -1,5 +1,7 @@
+#include "gtest/gtest.h"
 #include <cmath>
 #include <gtest/gtest.h>
+#include <memory_resource>
 #include <vsh/eh_sketch.hpp>
 
 namespace vsh {
@@ -9,7 +11,7 @@ bool operator==(const vsh::EHSketch::Box& lhs, const vsh::EHSketch::Box& rhs) {
            std::tie(rhs.count, rhs.interval_start, rhs.interval_finish);
 }
 
-std::ostream& operator<<(std::ostream& out, const vsh::EHSketch::Box& box) {
+std::ostream& operator<<(std::ostream& out, const EHSketch::Box& box) {
     out << "{ count:" << box.count << ", begin:" << box.interval_start << ", end:" << box.interval_finish << "}";
     return out;
 }
@@ -23,13 +25,22 @@ std::ostream& operator<<(std::ostream& out, const std::list<vsh::EHSketch::Box>&
     return out;
 }
 
+std::ostream& operator<<(std::ostream& out, const EHSketch::BoxList& boxes) {
+    out << "[";
+    for (const auto& box : boxes) {
+        out << box;
+    }
+    out << "]";
+    return out;
+}
+
 
 } // namespace vsh
 
 struct EHSketchTest : public vsh::EHSketch {
 
-    explicit EHSketchTest(std::uint64_t precision = 100, std::uint64_t window_size = -1)
-        : EHSketch(precision, window_size)
+    explicit EHSketchTest(std::pmr::memory_resource* res, std::uint64_t precision = 100, std::uint64_t window_size = -1)
+        : EHSketch(res, precision, window_size)
     {}
 
     using vsh::EHSketch::EHSketch;
@@ -46,7 +57,7 @@ struct EHSketchTest : public vsh::EHSketch {
         return precision_;
     }
 
-    const std::list<Box>& BoxesList() const noexcept {
+    const BoxList& BoxesList() const noexcept {
         return boxes_;
     }
 
@@ -56,8 +67,45 @@ struct EHSketchTest : public vsh::EHSketch {
     }
 };
 
+template <typename T1, typename T2>
+testing::AssertionResult CompareBoxLists(const T1& list1, const T2& list2) {
+    if (list1.size() != list2.size()) {
+        return testing::AssertionFailure() << "list1.size() != list2.size()";
+    }
+
+    auto it1 = list1.begin();
+    auto it2 = list2.begin();
+    
+    for (; it1 != list1.end() && it2 != list2.end(); ++it1, ++it2) {
+        if (it1->count != it2->count) {
+            return testing::AssertionFailure() << "it1->count(" << it1->count  
+                                               << ") != it2->count(" << it2->count 
+                                               << ")";
+        }
+
+
+        if (it1->interval_start != it2->interval_start) {
+            return testing::AssertionFailure() << "it1->interval_start(" << it1->interval_start
+                                               << ") != it2->interval_start(" << it2->interval_start
+                                               << ")";
+        }
+        
+        if (it1->interval_finish != it2->interval_finish) {
+            return testing::AssertionFailure() << "it1->interval_finish(" << it1->interval_finish
+                                               << ") != it2->interval_finish(" << it2->interval_finish
+                                               << ")";
+        }
+
+    }
+    return testing::AssertionSuccess() <<  "Ok";
+}
+
 TEST(TestEHSketch, Basic) {
-    EHSketchTest eh(/*precision=*/2, /*window_size=*/35);
+    std::array<std::byte, 1 << 20> buffer;
+    std::pmr::monotonic_buffer_resource local_pool{
+        buffer.data(), buffer.size()
+    };
+    EHSketchTest eh(&local_pool, /*precision=*/2, /*window_size=*/35);
 
     ASSERT_TRUE(eh.BoxesList().empty());
     ASSERT_EQ(eh.CurrentTime(), 0);
@@ -86,7 +134,11 @@ TEST(TestEHSketch, Basic) {
 }
 
 TEST(TestEHSketch, Compression) {
-    EHSketchTest eh(/*precision=*/2, /*window_size=*/35);
+    std::array<std::byte, 1 << 20> buffer;
+    std::pmr::monotonic_buffer_resource local_pool{
+        buffer.data(), buffer.size()
+    };
+    EHSketchTest eh(&local_pool, /*precision=*/2, /*window_size=*/35);
 
     using BoxList = std::list<vsh::EHSketch::Box>;
     std::vector<BoxList> expectation = {
@@ -108,17 +160,19 @@ TEST(TestEHSketch, Compression) {
 
     for (std::size_t i = 0; i < expectation.size(); i++) {
         ASSERT_NO_FATAL_FAILURE(eh.TickIncrement());
-        ASSERT_TRUE(
-            std::equal(expectation[i].begin(), expectation[i].end(), 
-                       eh.BoxesList().begin(), eh.BoxesList().end())
-        ) << "Failed at iteration: " << i << "\n"
+        ASSERT_TRUE(CompareBoxLists(expectation[i], eh.BoxesList()))
+          << "Failed at iteration: " << i << "\n"
           << "Etalon: " << expectation[i] << "\n"
           << "Actual: " << eh.BoxesList() << "\n";  
     }
 }
 
 TEST(TestEHSketch, ExcludingExpired) {
-    EHSketchTest eh(/*precision=*/2, /*window_size=*/4);
+    std::array<std::byte, 1 << 20> buffer;
+    std::pmr::monotonic_buffer_resource local_pool{
+        buffer.data(), buffer.size()
+    };
+    EHSketchTest eh(&local_pool, /*precision=*/2, /*window_size=*/4);
     using BoxList = std::list<vsh::EHSketch::Box>;
     std::vector<BoxList> expectation = {
         {{1, 1, 1}},
@@ -139,17 +193,19 @@ TEST(TestEHSketch, ExcludingExpired) {
 
     for (std::size_t i = 0; i < expectation.size(); i++) {
         ASSERT_NO_FATAL_FAILURE(eh.TickIncrement());
-        ASSERT_TRUE(
-            std::equal(expectation[i].begin(), expectation[i].end(), 
-                       eh.BoxesList().begin(), eh.BoxesList().end())
-        ) << "Failed at iteration: " << i << "\n"
+        ASSERT_TRUE(CompareBoxLists(expectation[i], eh.BoxesList()))
+          << "Failed at iteration: " << i << "\n"
           << "Etalon: " << expectation[i] << "\n"
-          << "Actual: " << eh.BoxesList() << "\n"; 
+          << "Actual: " << eh.BoxesList() << "\n";  
     } 
 }
 
 TEST(TestEHSketch, NoFatalFailureLongRun) {
-    EHSketchTest eh(/*precision=*/2);
+    std::array<std::byte, 1 << 20> buffer;
+    std::pmr::monotonic_buffer_resource local_pool{
+        buffer.data(), buffer.size()
+    };
+    EHSketchTest eh(&local_pool, /*precision=*/2);
     for (int i = 0; i < 1'000'000; i++) {
         ASSERT_NO_FATAL_FAILURE(eh.TickIncrement());
     }

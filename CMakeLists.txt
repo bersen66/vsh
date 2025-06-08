@@ -7,9 +7,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-set(VSH_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
-set(THIRD_PARTY_DIR "${VSH_ROOT}/third_party/")
-set(EXTERN_DIR "${VSH_ROOT}/extern/")
+set(VSH_ROOT        "${CMAKE_CURRENT_SOURCE_DIR}")
+set(THIRD_PARTY_DIR "${VSH_ROOT}/third_party/"   )
+set(EXTERN_DIR      "${VSH_ROOT}/extern/"        )
 
 list(APPEND CMAKE_MODULE_PATH "${VSH_ROOT}/cmake")
 
@@ -17,6 +17,7 @@ include(VshOptions)
 include(PrepareExternDir)
 include(BuildArrow)
 include(BuildDatasketches)
+include(Sanitizers)
 
 include(Sanitizers)
 
@@ -26,5 +27,10 @@ if (VSH_BUILD_TESTS)
     include(GoogleTest)
 endif()
 
+if (VSH_BUILD_BENCHMARKS)
+    include(BuildBenchmark)
+endif()
+
 add_subdirectory(lib)
+
 

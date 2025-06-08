@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory_resource>
 #include <vsh/histogram.hpp>
 #include <vsh/key_iterator_fwd.hpp>
 #include <vsh/eh_sketch.hpp>
@@ -14,6 +15,8 @@ public:
     static constexpr double kMaxCoef = 1.7f;
 public:
 
+    std::pmr::memory_resource* RecommendedMemoryPool();
+
     struct Bar {
         EHSketch eh; 
         double interval_min;
@@ -21,9 +24,10 @@ public:
         bool is_blocked = false;
     };
 
-    using BarList = std::list<Bar>;
+    using BarList = std::pmr::list<Bar>;
     using BarIter = BarList::iterator;
-    using BarSearchMap = std::map<double, BarIter>;
+    using BarSearchMap = std::pmr::map<double, BarIter>;
+    using BarIndexIter = BarSearchMap::iterator;
 
     [[nodiscard]]std::size_t AggregateSize(BarIter it) const;
     
@@ -32,7 +36,8 @@ public:
     [[nodiscard]]bool EmptyBar(BarIter it) const;
 public:
     
-    explicit BarSplittingHistBuilder(std::uint64_t buckets_num, 
+    explicit BarSplittingHistBuilder(std::pmr::memory_resource* resource,
+                                     std::uint64_t buckets_num, 
                                      double scaling_factor = 4.f,
                                      std::uint64_t eh_sketch_precision = 100,
                                      std::uint64_t window_size = -1);
@@ -72,13 +77,15 @@ protected:
     }
 
 protected:
-    std::list<Bar> bars_;
-    std::map<double, BarIter> search_map_;
+    std::pmr::memory_resource* mem_resource_;
+    BarList bars_;
+    BarSearchMap search_map_;
     std::uint64_t eh_sketch_precision_;
     std::uint64_t window_size_;
     std::uint64_t elements_visited_;
     std::uint64_t buckets_num_;
     double scaling_factor_;
+    bool is_first_iter_;
 };
 
 } // namespace vsh
