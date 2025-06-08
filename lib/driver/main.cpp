@@ -8,7 +8,6 @@
 #include <vsh/bar_splitting_hist.hpp>
 #include <cstdlib>
 #include <cstdio>
-#include <iostream>
 #include <unistd.h>
 #include <vsh/key_iterator.hpp>
 #include <vsh/histogram.hpp>
@@ -138,13 +137,13 @@ DistributionMetrics EvaluateDistributionMetrics(const vsh::ConsumerList& consume
 }
 
 inline void PrintHelpMessage() {
-    std::cerr << R"help_message(
+    std::printf(R"help_message(
 Usage: ./driver <algo> <file> <number_of_partitions> <dataset_column>
     * algo                 -- supported values: "hash", "quantiles", "bash"
     * file                 -- path to dataset
     * number_of_partitions -- must be positive integer
     * dataset_column       -- must be non negative integer
-)help_message" << std::endl;
+)help_message");
 }
 
 int main(int argc, char** argv) {
@@ -167,7 +166,7 @@ int main(int argc, char** argv) {
             flagColumnIdx           = std::atoi(argv[4]);
         }
     } catch (const std::exception& exc) {
-        std::cerr << "Exception: " << exc.what() << std::endl; 
+        std::printf("Exception: %s\n", exc.what());
         PrintHelpMessage();
         return EXIT_FAILURE;
     }
