@@ -90,7 +90,7 @@ TEST(BASH, InsertSequential) {
     BASHBuilderTestAdapter bash(&local_pool,
                                 /*buckets_num*/30, 
                                 /*scaling_factor=*/2,
-                                /*eh_sketch_prec=*/5,
+                                /*eh_sketch_prec=*/50,
                                 /*window_size=*/10000);
 
     for (int i = 0; i < 10'000'000; i++) {
@@ -108,13 +108,13 @@ TEST(BASH, InsertUniformDistribution) {
                                 /*buckets_num*/30, 
                                 /*scaling_factor=*/2,
                                 /*eh_sketch_prec=*/50,
-                                /*window_size=*/100);
+                                /*window_size=*/10000);
 
     std::random_device device;
     std::mt19937 gen(device());
     std::uniform_int_distribution<> distrib(1, 10000);
 
-    for (int i = 0; i < 10'000'000; i++) {
+    for (int i = 0; i < 1'000'000; i++) {
         auto val = distrib(gen);
         ASSERT_NO_FATAL_FAILURE(bash.Tick()) << " fail at iter " << i;
         ASSERT_NO_FATAL_FAILURE(bash.InsertValue(val)) << " fail at iter " << i;

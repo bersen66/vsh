@@ -67,59 +67,138 @@ std::size_t BarSplittingHistBuilder::AggregateSize(BarIter start) const {
 }
 
 BarIter BarSplittingHistBuilder::FindOrCreateBarFor(double value) {
-    // TODO: optimize
-    BarIndexIter it;
-    bool add_front = search_map_.empty();
-    bool add_back = false;
+    auto it = search_map_.begin(); // Используем it для итерации
     bool exact_match = false;
+    bool add_front = false;
+    bool add_back = false;
 
-    for (it = search_map_.begin(); it != search_map_.end(); it++) {
-        const auto& [key, bar] = *it;
+    // Сначала ищем точное совпадение или место для вставки.
+    // Если search_map_ пуст, то мы создадим первый бар в AddValue.
+    if (search_map_.empty()) {
+        // Эта ветка обрабатывает самый первый элемент,
+        // который поступает в гистограмму.
+        bars_.push_back(Bar{
+            .eh=EHSketch(mem_resource_, eh_sketch_precision_, window_size_),
+            .interval_min=value,
+            .interval_max=value,
+            .is_blocked=false
+        });
+        BarIter new_bar_it = bars_.begin(); // Должен быть первым и единственным элементом
+        search_map_[value] = new_bar_it;
+        return new_bar_it;
+    }
 
-        // Exact match of interval
-        if (bar->interval_min <= value && value < bar->interval_max) {
-            exact_match = true;
-            break;
+    // Ищем бар, который содержит значение, или место для вставки
+    it = search_map_.upper_bound(value); // Находим первый бар, whose interval_min is > value
+
+    if (it != search_map_.begin()) {
+        auto prev_it = std::prev(it);
+        BarIter prev_bar_it = prev_it->second;
+        // Проверяем, попадает ли значение в предыдущий бар
+        if (value >= prev_bar_it->interval_min && value < prev_bar_it->interval_max) {
+            return prev_bar_it; // Значение попадает в существующий бар
         }
+        // Специальный случай: если значение равно interval_max предыдущего бара,
+        // это может быть граничный случай, где мы хотим расширить предыдущий бар.
+        // Или это должно быть началом нового бара.
+        // Для простоты, пока будем считать, что оно должно быть "меньше" next interval_min.
+    }
 
-        // Value less than all of values before
-        if (bar->interval_min > value) {
-            add_front = true;
-            break;
-        }
-
-        // Value bigger than all of values before
-        if (std::next(it) == search_map_.end()) {
+    // Если value меньше, чем interval_min самого первого бара
+    if (it == search_map_.begin()) {
+        add_front = true;
+    } else {
+        // Если value больше, чем interval_max всех существующих баров
+        // (т.е. value >= max(all_interval_max)), then add_back
+        // Поскольку upper_bound нашел бы что-то, если бы value было внутри существующих баров
+        // или до них, если it == search_map_.end(), значит value больше всех ключей.
+        if (it == search_map_.end()) {
             add_back = true;
-            break;
-        } 
-
+        }
     }
 
-    if (exact_match) {
-        return it->second;
-    }
- 
-        
+
     if (add_front) {
-        double curr_min = bars_.front().interval_min;
+        // Создаем новый бар в начале
+        // Его interval_max будет interval_min старого первого бара,
+        // или value, если bars_ был пуст.
+        double new_bar_max = bars_.empty() ? value : bars_.front().interval_min;
         bars_.push_front(Bar{
             .eh=EHSketch(mem_resource_, eh_sketch_precision_, window_size_),
             .interval_min=value,
-            .interval_max=bars_.empty() ? value : curr_min,
+            .interval_max=new_bar_max, // Для интервалов [min, max), max > min.
+                                       // Для одиночных точек, min = max.
+                                       // Если min > max, это ошибка.
             .is_blocked=false
         });
         search_map_[value] = bars_.begin();
         return bars_.begin();
     }
 
-    
-    // return last bar
     if (add_back) {
-        return it->second;
+        // Здесь мы должны **всегда** создавать новый бар, если value больше, чем interval_max последнего бара.
+        // Если у нас уже есть бары, то новый бар начинается с interval_max последнего существующего бара
+        // и заканчивается новым значением.
+        // Если bars_ пуст, этот случай не должен быть достигнут, так как он обрабатывается в начале.
+        BarIter last_bar_it = std::prev(bars_.end()); // Последний бар
+        
+        // Убедимся, что interval_max последнего бара не меньше, чем interval_min.
+        // Для последовательных ID, интервалы будут [X, Y], где X <= Y.
+        double new_bar_min = last_bar_it->interval_max; // Начало нового бара - конец предыдущего
+
+        // Если value совпадает с interval_max последнего бара, это особый случай.
+        // Возможно, мы хотим расширить последний бар, а не создавать новый.
+        // В случае с последовательными ID, это, вероятно, означает, что мы должны
+        // расширить interval_max последнего бара.
+        if (value == last_bar_it->interval_max) {
+             return last_bar_it; // Значение совпадает с концом последнего бара, ничего не делаем.
+        }
+        
+        // Если value просто больше, чем interval_max последнего бара,
+        // то создаем новый бар.
+        if (value > last_bar_it->interval_max) {
+             bars_.push_back(Bar{
+                .eh=EHSketch(mem_resource_, eh_sketch_precision_, window_size_),
+                .interval_min=new_bar_min, // Начало нового бара - конец предыдущего
+                .interval_max=value,
+                .is_blocked=false
+            });
+            BarIter new_bar_it = std::prev(bars_.end());
+            search_map_[new_bar_it->interval_min] = new_bar_it;
+            return new_bar_it;
+        } else {
+            // Этот случай означает, что value находится где-то внутри bars_
+            // но не попал ни в один из существующих баров (щель).
+            // Это может быть проблемой с логикой upper_bound/prev_it.
+            // Или это означает, что value > prev_bar_it->interval_max
+            // но it != search_map_.end()
+            // Вставьте новый бар между prev_bar_it и it.
+            // Это требует более сложной логики вставки в середину списка и map.
+            // Для последовательных ID, это не должно происходить.
+            // В целях отладки, пока просто вернем последний бар.
+            return last_bar_it; 
+        }
     }
 
-    return it->second;
+    // Если мы дошли сюда, значит it указывает на бар, чей interval_min > value,
+    // и prev_it->second (если существует) не содержит value.
+    // Это указывает на "щель" между барами или на ошибку в логике поиска.
+    // Для последовательных данных это крайне маловероятно.
+    // В идеале здесь должен быть вставлен новый бар между двумя существующими.
+    // Например:
+    BarIter next_bar_it = it->second; // Бар, чей interval_min > value
+    BarIter prev_bar_it = std::prev(it)->second; // Бар, чей interval_max < value
+    
+    // Создаем новый бар в этой "щели"
+    bars_.insert(next_bar_it, Bar{ // Вставляем перед next_bar_it
+        .eh=EHSketch(mem_resource_, eh_sketch_precision_, window_size_),
+        .interval_min=prev_bar_it->interval_max,
+        .interval_max=value,
+        .is_blocked=false
+    });
+    BarIter new_bar_it = std::prev(next_bar_it); // Новый бар находится перед next_bar_it
+    search_map_[new_bar_it->interval_min] = new_bar_it;
+    return new_bar_it;
 }
 
 bool BarSplittingHistBuilder::FindAdjacentBothEmpty(BarIter& out1, BarIter& out2) const {
@@ -389,7 +468,12 @@ void BarSplittingHistBuilder::InsertIntoBar(double value) {
 }
 
 void BarSplittingHistBuilder::HandleIteration(KeyIterator& iter, TypeAdapter& conv) {
-    Tick();
+    static std::uint32_t i = 0;
+    i++;
+    if(i % window_size_ == 0) {
+        Tick();
+        i = 0;
+    }
     InsertIntoBar(conv.AsDouble(iter.Value()));
 } 
 

@@ -1,6 +1,7 @@
 #pragma once 
 
 #include <any>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -8,6 +9,7 @@ namespace vsh {
 
 struct IConsumerNode {
     virtual void Consume(std::any data) = 0;
+    virtual std::uint64_t RowsProcessed() const = 0;
     virtual ~IConsumerNode() = default;
 };
 
@@ -24,6 +26,9 @@ public:
         rows_processed_++;
     }
 
+    std::uint64_t RowsProcessed() const override {
+        return rows_processed_;
+    }
 public:
     std::size_t rows_processed_; 
 };
